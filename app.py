@@ -52,6 +52,7 @@ def send_discord_notify(message):
 
 def watcher_loop():
     while True:
+        print("--- 監視ループ実行中 ---")
         if watching:
             for p in PRODUCTS:
                 price = get_price(p["url"])
@@ -63,7 +64,8 @@ def watcher_loop():
                     send_discord_notify(
                         f"💸 {p['name']} が安くなった！\n現在価格: {price}円\nしきい値: {p['threshold']}円\n{p['url']}"
                     )
-        time.sleep(300)
+        time.sleep(30)  # ← テスト用に30秒ごとにチェック
+
 
 
 # -------------------- Flaskルート --------------------
