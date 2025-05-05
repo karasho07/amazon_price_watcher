@@ -65,6 +65,7 @@ def watcher_loop():
                     )
         time.sleep(300)
 
+
 # -------------------- Flaskルート --------------------
 
 @app.route("/", methods=["GET", "POST"])
