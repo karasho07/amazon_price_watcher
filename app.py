@@ -52,7 +52,7 @@ def send_discord_notify(message):
 
 def watcher_loop():
     while True:
-        print("--- 監視ループ実行中 ---")
+        print("★ 監視ループが実行されました", flush=True)  
         if watching:
             for p in PRODUCTS:
                 price = get_price(p["url"])
