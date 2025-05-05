@@ -9,7 +9,7 @@ import os
 app = Flask(__name__)
 
 # ✅ ご自身の Discord Webhook URL に変更してください！
-DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/xxxxxx/xxxxxxxx"
+DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1368929606534697001/-IppnMnlCbbbWV2jwiT2yObA4xX_9OGTAqSswd9C2vzfVArV1Wbe3wMoRSN4q44-f9Gr"
 
 DATA_FILE = "products.json"
 PRODUCTS = []
