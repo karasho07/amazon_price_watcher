@@ -35,13 +35,23 @@ def get_price(url):
         }
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-        price_tag = soup.select_one("#twister-plus-price-data-price, #priceblock_ourprice, #priceblock_dealprice")
+
+        # 一番よく使われているAmazonの価格クラス（2024年現在）
+        price_tag = soup.select_one("span.a-price span.a-offscreen")
         if price_tag:
             price_text = price_tag.text.replace(",", "").replace("￥", "").strip()
             return int("".join(filter(str.isdigit, price_text)))
+
+        # バックアップとして旧セレクタでも探す
+        fallback = soup.select_one("#priceblock_ourprice") or soup.select_one("#priceblock_dealprice")
+        if fallback:
+            price_text = fallback.text.replace(",", "").replace("￥", "").strip()
+            return int("".join(filter(str.isdigit, price_text)))
+
     except Exception as e:
         print("価格取得エラー:", e, flush=True)
     return None
+
 
 # Discord通知
 def send_discord_notify(message):
