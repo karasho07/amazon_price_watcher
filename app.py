@@ -70,6 +70,11 @@ def watcher_loop():
 
 # -------------------- Flaskルート --------------------
 
+@app.route("/start_watcher")
+def start_watcher():
+    threading.Thread(target=watcher_loop, daemon=True).start()
+    return "✅ 監視スレッドを起動しました！"
+
 @app.route("/", methods=["GET", "POST"])
 def index():
     global watching
@@ -98,6 +103,7 @@ def index():
                 msg = f"✅ {name}（しきい値: {threshold}円）を追加しました！"
             except:
                 msg = "⚠️ 入力が正しくありません"
+
 
     html = """
     <html>
