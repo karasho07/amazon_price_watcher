@@ -8,15 +8,15 @@ import os
 
 app = Flask(__name__)
 
-# ✅ ご自身の Discord Webhook URL に変更してください！
-DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/1368929606534697001/-IppnMnlCbbbWV2jwiT2yObA4xX_9OGTAqSswd9C2vzfVArV1Wbe3wMoRSN4q44-f9Gr"
+# Webhook URL（ご自身のDiscord Webhookに差し替えてください）
+DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/xxxxxxxx/xxxxxxxx"
 
 DATA_FILE = "products.json"
 PRODUCTS = []
 watching = False
+watcher_thread = None
 
-# -------------------- データ保存/読み込み --------------------
-
+# データ保存・読み込み
 def load_products():
     if os.path.exists(DATA_FILE):
         with open(DATA_FILE, "r", encoding="utf-8") as f:
@@ -27,20 +27,23 @@ def save_products():
     with open(DATA_FILE, "w", encoding="utf-8") as f:
         json.dump(PRODUCTS, f, ensure_ascii=False, indent=2)
 
-# -------------------- 商品価格取得/通知 --------------------
-
+# 現在の価格を取得（AmazonページのHTMLをパース）
 def get_price(url):
-    headers = {"User-Agent": "Mozilla/5.0"}
     try:
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-        price_tag = soup.select_one("span.a-price span.a-offscreen")
+        price_tag = soup.select_one("#twister-plus-price-data-price, #priceblock_ourprice, #priceblock_dealprice")
         if price_tag:
-            return int(price_tag.get_text(strip=True).replace("￥", "").replace(",", ""))
-    except:
-        pass
+            price_text = price_tag.text.replace(",", "").replace("￥", "").strip()
+            return int("".join(filter(str.isdigit, price_text)))
+    except Exception as e:
+        print("価格取得エラー:", e, flush=True)
     return None
 
+# Discord通知
 def send_discord_notify(message):
     try:
         data = {"content": message}
@@ -48,33 +51,35 @@ def send_discord_notify(message):
     except:
         pass
 
-# -------------------- 監視ループ（別スレッド） --------------------
-
+# 監視ループ（別スレッド）
 def watcher_loop():
     while True:
-        print("★ 監視ループが実行されました", flush=True)  
+        print("★ 監視ループが実行されました", flush=True)
         if watching:
             for p in PRODUCTS:
                 price = get_price(p["url"])
                 if price is None:
-                    print(f"[{p['name']}] 価格取得失敗")
+                    print(f"[{p['name']}] 価格取得失敗", flush=True)
                     continue
-                print(f"[{p['name']}] 現在の価格: {price}円")
+                print(f"[{p['name']}] 現在の価格: {price}円", flush=True)
                 if price <= p["threshold"]:
                     send_discord_notify(
-                        f"💸 {p['name']} が安くなった！\n現在価格: {price}円\nしきい値: {p['threshold']}円\n{p['url']}"
+                        f"📉 {p['name']} が安くなった！\n現在価格: {price}円\nしきい値: {p['threshold']}円\n{p['url']}"
                     )
-        time.sleep(300)  # ← テスト用に30秒ごとにチェック
+        time.sleep(300)
 
-
-
-# -------------------- Flaskルート --------------------
-
+# スレッド手動起動（多重起動防止付き）
 @app.route("/start_watcher")
 def start_watcher():
-    threading.Thread(target=watcher_loop, daemon=True).start()
-    return "✅ 監視スレッドを起動しました！"
+    global watcher_thread
+    if not watcher_thread or not watcher_thread.is_alive():
+        watcher_thread = threading.Thread(target=watcher_loop, daemon=True)
+        watcher_thread.start()
+        return "✅ 監視スレッドを起動しました！"
+    else:
+        return "⚠️ すでに監視スレッドが動いています。"
 
+# フロントエンドとフォーム処理
 @app.route("/", methods=["GET", "POST"])
 def index():
     global watching
@@ -103,7 +108,6 @@ def index():
                 msg = f"✅ {name}（しきい値: {threshold}円）を追加しました！"
             except:
                 msg = "⚠️ 入力が正しくありません"
-
 
     html = """
     <html>
@@ -151,9 +155,7 @@ def index():
     """
     return render_template_string(html, products=PRODUCTS, watching=watching, msg=msg)
 
-# -------------------- 起動処理 --------------------
-
+# 起動処理
 if __name__ == "__main__":
     PRODUCTS = load_products()
-    threading.Thread(target=watcher_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
