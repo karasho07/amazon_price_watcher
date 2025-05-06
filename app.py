@@ -1,95 +1,60 @@
 from flask import Flask, request, render_template_string
+from models import db, Product
 import threading
+import time
 import requests
 from bs4 import BeautifulSoup
-import time
-import json
 import os
 
 app = Flask(__name__)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URL")
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+db.init_app(app)
 
-# Webhook URL（ご自身のDiscord Webhookに差し替えてください）
-DISCORD_WEBHOOK_URL = "https://discordapp.com/api/webhooks/xxxxxxxx/xxxxxxxx"
-
-DATA_FILE = "products.json"
-PRODUCTS = []
 watching = False
-watcher_thread = None
 
-# データ保存・読み込み
-def load_products():
-    if os.path.exists(DATA_FILE):
-        with open(DATA_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
-    return []
-
-def save_products():
-    with open(DATA_FILE, "w", encoding="utf-8") as f:
-        json.dump(PRODUCTS, f, ensure_ascii=False, indent=2)
-
-# 現在の価格を取得（AmazonページのHTMLをパース）
+# 商品価格を取得する関数
 def get_price(url):
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-
-        # 一番よく使われているAmazonの価格クラス（2024年現在）
-        price_tag = soup.select_one("span.a-price span.a-offscreen")
+        price_tag = soup.select_one("#twister-plus-price-data-price, #priceblock_ourprice, #priceblock_dealprice")
         if price_tag:
             price_text = price_tag.text.replace(",", "").replace("￥", "").strip()
             return int("".join(filter(str.isdigit, price_text)))
-
-        # バックアップとして旧セレクタでも探す
-        fallback = soup.select_one("#priceblock_ourprice") or soup.select_one("#priceblock_dealprice")
-        if fallback:
-            price_text = fallback.text.replace(",", "").replace("￥", "").strip()
-            return int("".join(filter(str.isdigit, price_text)))
-
     except Exception as e:
         print("価格取得エラー:", e, flush=True)
     return None
 
+# Discord通知（必要なら）
+def send_discord_notify(msg):
+    webhook = os.environ.get("https://discordapp.com/api/webhooks/1368929606534697001/-IppnMnlCbbbWV2jwiT2yObA4xX_9OGTAqSswd9C2vzfVArV1Wbe3wMoRSN4q44-f9Gr")
+    if webhook:
+        try:
+            requests.post(webhook, json={"content": msg})
+        except:
+            pass
 
-# Discord通知
-def send_discord_notify(message):
-    try:
-        data = {"content": message}
-        requests.post(DISCORD_WEBHOOK_URL, json=data)
-    except:
-        pass
-
-# 監視ループ（別スレッド）
+# 監視ループ
 def watcher_loop():
+    print("★ 監視ループが開始されました", flush=True)
     while True:
-        print("★ 監視ループが実行されました", flush=True)
         if watching:
-            for p in PRODUCTS:
-                price = get_price(p["url"])
-                if price is None:
-                    print(f"[{p['name']}] 価格取得失敗", flush=True)
-                    continue
-                print(f"[{p['name']}] 現在の価格: {price}円", flush=True)
-                if price <= p["threshold"]:
-                    send_discord_notify(
-                        f"📉 {p['name']} が安くなった！\n現在価格: {price}円\nしきい値: {p['threshold']}円\n{p['url']}"
-                    )
-        time.sleep(300)
+            with app.app_context():
+                for product in Product.query.all():
+                    price = get_price(product.url)
+                    if price is None:
+                        print(f"{product.name} → 価格取得失敗", flush=True)
+                        continue
+                    print(f"[{product.name}] 現在価格: {price}円", flush=True)
+                    if price <= product.threshold:
+                        send_discord_notify(
+                            f"🔔 {product.name} が安くなった！\n現在価格: {price}円\nしきい値: {product.threshold}円\n{product.url}"
+                        )
+        time.sleep(300)  # 5分おき
 
-# スレッド手動起動（多重起動防止付き）
-@app.route("/start_watcher")
-def start_watcher():
-    global watcher_thread
-    if not watcher_thread or not watcher_thread.is_alive():
-        watcher_thread = threading.Thread(target=watcher_loop, daemon=True)
-        watcher_thread.start()
-        return "✅ 監視スレッドを起動しました！"
-    else:
-        return "⚠️ すでに監視スレッドが動いています。"
-
-# フロントエンドとフォーム処理
+# Webルート
 @app.route("/", methods=["GET", "POST"])
 def index():
     global watching
@@ -103,22 +68,25 @@ def index():
             watching = False
             msg = "🛑 監視を停止しました。"
         elif "delete" in request.form:
-            delete_index = int(request.form["delete"])
-            if 0 <= delete_index < len(PRODUCTS):
-                deleted = PRODUCTS.pop(delete_index)
-                save_products()
-                msg = f"🗑 {deleted['name']} を削除しました"
+            delete_id = int(request.form["delete"])
+            product = Product.query.get(delete_id)
+            if product:
+                db.session.delete(product)
+                db.session.commit()
+                msg = f"🗑 {product.name} を削除しました"
         elif "name" in request.form and "url" in request.form and "threshold" in request.form:
             try:
                 name = request.form["name"]
                 url = request.form["url"]
                 threshold = int(request.form["threshold"])
-                PRODUCTS.append({"name": name, "url": url, "threshold": threshold})
-                save_products()
+                new_product = Product(name=name, url=url, threshold=threshold)
+                db.session.add(new_product)
+                db.session.commit()
                 msg = f"✅ {name}（しきい値: {threshold}円）を追加しました！"
             except:
                 msg = "⚠️ 入力が正しくありません"
 
+    products = Product.query.all()
     html = """
     <html>
     <head>
@@ -155,7 +123,7 @@ def index():
                 <a href="{{ p.url }}" target="_blank"><strong>{{ p.name }}</strong></a>
                 （しきい値：{{ p.threshold }}円）
                 <form method="post" style="display:inline">
-                    <button name="delete" value="{{ loop.index0 }}">🗑 削除</button>
+                    <button name="delete" value="{{ p.id }}">🗑 削除</button>
                 </form>
             </li>
         {% endfor %}
@@ -163,9 +131,11 @@ def index():
     </body>
     </html>
     """
-    return render_template_string(html, products=PRODUCTS, watching=watching, msg=msg)
+    return render_template_string(html, products=products, watching=watching, msg=msg)
 
 # 起動処理
 if __name__ == "__main__":
-    PRODUCTS = load_products()
+    with app.app_context():
+        db.create_all()
+    threading.Thread(target=watcher_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
