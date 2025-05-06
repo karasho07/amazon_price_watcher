@@ -13,24 +13,20 @@ db.init_app(app)
 
 watching = False
 
-# 商品価格を取得する関数
+# 商品価格を取得する関数（改良版）
 def get_price(url):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-        
-        # ここで一度全体をファイルなどに保存すると中身を見られる（開発用）
-        with open("dump.html", "w", encoding="utf-8") as f:
-            f.write(soup.prettify())
 
-        # 現状の取得処理
         selectors = [
             "#twister-plus-price-data-price",
             "#priceblock_ourprice",
             "#priceblock_dealprice",
             "#priceblock_pospromoprice",
-            ".a-price .a-offscreen"
+            ".a-price .a-offscreen",
+            ".a-price-whole"
         ]
 
         for selector in selectors:
@@ -44,8 +40,7 @@ def get_price(url):
         print("価格取得エラー:", e, flush=True)
     return None
 
-
-# Discord通知（必要なら）
+# Discord通知
 def send_discord_notify(msg):
     webhook = os.environ.get("DISCORD_WEBHOOK_URL")
     if webhook:
@@ -56,7 +51,6 @@ def send_discord_notify(msg):
 
 # 監視ループ
 def watcher_loop():
-    import time
     while True:
         print("監視ループ実行中", flush=True)
         with app.app_context():
@@ -72,8 +66,6 @@ def watcher_loop():
                     print(f"🚨 通知送信: {msg}", flush=True)
                     send_discord_notify(msg)
         time.sleep(300)
-
-
 
 # Webルート
 @app.route("/", methods=["GET", "POST"])
