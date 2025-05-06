@@ -40,7 +40,7 @@ def get_price(url):
         
         print("❌ 価格が見つかりませんでした。")
     except Exception as e:
-        print("エラー:", e)
+        print(f"価格取得エラー: {e}", flush=True)
     return None
 
 
