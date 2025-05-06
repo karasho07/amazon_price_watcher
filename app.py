@@ -19,13 +19,31 @@ def get_price(url):
         headers = {"User-Agent": "Mozilla/5.0"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
-        price_tag = soup.select_one("#twister-plus-price-data-price, #priceblock_ourprice, #priceblock_dealprice")
-        if price_tag:
-            price_text = price_tag.text.replace(",", "").replace("￥", "").strip()
-            return int("".join(filter(str.isdigit, price_text)))
+        
+        # ここで一度全体をファイルなどに保存すると中身を見られる（開発用）
+        with open("dump.html", "w", encoding="utf-8") as f:
+            f.write(soup.prettify())
+
+        # 現状の取得処理
+        selectors = [
+            "#twister-plus-price-data-price",
+            "#priceblock_ourprice",
+            "#priceblock_dealprice",
+            "#priceblock_pospromoprice",
+            ".a-price .a-offscreen"
+        ]
+
+        for selector in selectors:
+            tag = soup.select_one(selector)
+            if tag:
+                price_text = tag.text.replace(",", "").replace("￥", "").strip()
+                print(f"[デバッグ] {selector} → {price_text}", flush=True)
+                return int("".join(filter(str.isdigit, price_text)))
+
     except Exception as e:
         print("価格取得エラー:", e, flush=True)
     return None
+
 
 # Discord通知（必要なら）
 def send_discord_notify(msg):
