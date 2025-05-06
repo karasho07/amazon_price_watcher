@@ -17,29 +17,21 @@ watching = False
 def get_price(url):
     try:
         headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
-}
-
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:123.0) Gecko/20100101 Firefox/123.0"
+        }
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
 
-        selectors = [
-            ".a-price .a-offscreen",  # 通常価格・セール価格
-            "#priceblock_ourprice",
-            "#priceblock_dealprice",
-            "#priceblock_pospromoprice",
-        ]
+        whole = soup.select_one(".a-price-whole")
+        fraction = soup.select_one(".a-price-fraction")
 
-        for selector in selectors:
-            tag = soup.select_one(selector)
-            if tag:
-                price_text = tag.text.replace(",", "").replace("￥", "").strip()
-                print(f"[デバッグ] {selector} → {price_text}", flush=True)
-                return int("".join(filter(str.isdigit, price_text)))
-
+        if whole and fraction:
+            price_str = whole.text.strip() + fraction.text.strip()
+            return int("".join(filter(str.isdigit, price_str)))
     except Exception as e:
-        print("価格取得エラー:", e, flush=True)
+        print(f"価格取得エラー: {e}", flush=True)
     return None
+
 
 # Discord通知
 def send_discord_notify(msg):
