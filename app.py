@@ -32,25 +32,26 @@ def get_price(url):
         soup = BeautifulSoup(res.text, "html.parser")
 
         selectors = [
+            ".a-price .a-offscreen",  # Amazonの最新価格表示形式
             "#priceblock_ourprice",
             "#priceblock_dealprice",
             "#priceblock_pospromoprice",
-            ".a-price .a-offscreen",
         ]
 
         for selector in selectors:
             tag = soup.select_one(selector)
             if tag:
-                price_text = tag.get_text(strip=True).replace("￥", "").replace(",", "")
+                price_text = tag.text.strip().replace(",", "").replace("￥", "")
                 print(f"[DEBUG] マッチしたセレクタ: {selector}")
                 print(f"現在価格: {price_text}円")
-                return int(float(price_text))
+                return int("".join(filter(str.isdigit, price_text)))
 
         print("❌ 価格が見つかりませんでした。")
     except Exception as e:
         print("エラー:", e)
 
     return None
+
 
 # Discord通知
 def send_discord_notify(msg):

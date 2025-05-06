@@ -30,5 +30,5 @@ def get_amazon_price(url):
         print("エラー:", e)
 
 # ここに取得したい商品のURLを入れる
-url = "https://www.amazon.co.jp/dp/B0DFC1NZZV"
+url = "https://www.amazon.co.jp/dp/B0BGNC9F44"
 get_amazon_price(url)
