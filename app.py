@@ -16,33 +16,25 @@ watching = False
 # 商品価格を取得する関数
 def get_price(url):
     try:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36"
-        }
+        headers = {"User-Agent": "Mozilla/5.0"}
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
 
-        # まず従来のセレクタ
-        price_tag = soup.select_one(
-            "#twister-plus-price-data-price, #priceblock_ourprice, #priceblock_dealprice, #price_inside_buybox"
-        )
+        whole = soup.select_one(".a-price-whole")
+        fraction = soup.select_one(".a-price-fraction")
 
-        if not price_tag:
-            # 新しい価格形式に対応
-            whole = soup.select_one(".a-price-whole")
-            fraction = soup.select_one(".a-price-fraction")
-            if whole:
-                price_text = whole.text.replace(",", "")
-                if fraction:
-                    price_text += "." + fraction.text
-                return int(float(price_text))  # 小数も対応
+        if whole:
+            price_text = whole.get_text() + (fraction.get_text() if fraction else "")
+            price = int("".join(filter(str.isdigit, price_text)))
+            return price
 
-        else:
-            price_text = price_tag.text.replace("￥", "").replace(",", "").strip()
-            return int(float(price_text))
+        print("価格情報が見つかりません")
+        return None
 
     except Exception as e:
-        print("価格取得エラー：", e, flush=True)
+        print(f"価格取得エラー: {e}", flush=True)
+        return None
+
 
 
 # Discord通知（必要なら）
