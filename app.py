@@ -24,12 +24,10 @@ def get_price(url):
         soup = BeautifulSoup(res.text, "html.parser")
 
         selectors = [
-            "#twister-plus-price-data-price",
+            ".a-price .a-offscreen",  # 通常価格・セール価格
             "#priceblock_ourprice",
             "#priceblock_dealprice",
             "#priceblock_pospromoprice",
-            ".a-price .a-offscreen",
-            ".a-price-whole"
         ]
 
         for selector in selectors:
