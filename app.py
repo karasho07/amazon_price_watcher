@@ -14,7 +14,7 @@ db.init_app(app)
 watching = False
 
 # 商品価格を取得する関数（改良版）
-def get_amazon_price(url):
+def get_price(url):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
     }
