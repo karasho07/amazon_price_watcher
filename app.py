@@ -81,7 +81,7 @@ def watcher_loop():
                         send_discord_notify(msg)
                 except Exception as e:
                     print(f"🚫 {p.name} エラー: {e}", flush=True)
-        time.sleep(300)
+        time.sleep(360)
 
 # Webルート
 @app.route("/", methods=["GET", "POST"])
