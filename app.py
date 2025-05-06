@@ -7,7 +7,7 @@ from bs4 import BeautifulSoup
 import os
 
 app = Flask(__name__)
-app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("DATABASE_URI")
+app.config["SQLALCHEMY_DATABASE_URI"] = os.environ.get("SQLALCHEMY_DATABASE_URI", "sqlite:///products.db")
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 db.init_app(app)
 
@@ -38,21 +38,21 @@ def send_discord_notify(msg):
 
 # 監視ループ
 def watcher_loop():
-    print("★ 監視ループが開始されました", flush=True)
+    import time
     while True:
-        if watching:
-            with app.app_context():
-                for product in Product.query.all():
-                    price = get_price(product.url)
-                    if price is None:
-                        print(f"{product.name} → 価格取得失敗", flush=True)
-                        continue
-                    print(f"[{product.name}] 現在価格: {price}円", flush=True)
-                    if price <= product.threshold:
-                        send_discord_notify(
-                            f"🔔 {product.name} が安くなった！\n現在価格: {price}円\nしきい値: {product.threshold}円\n{product.url}"
-                        )
-        time.sleep(300)  # 5分おき
+        print("監視ループ実行中")
+        with app.app_context():  # ← これを追加
+            products = Product.query.all()
+            for p in products:
+                price = get_price(p.url)
+                if price is None:
+                    print(f"{p.name} 価格取得失敗")
+                    continue
+                print(f"{p.name} 現在価格: {price}円")
+                if price <= p.threshold:
+                    send_discord_alert(p.name, price, p.threshold, p.url)
+        time.sleep(300)
+
 
 # Webルート
 @app.route("/", methods=["GET", "POST"])
