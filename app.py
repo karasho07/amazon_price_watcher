@@ -40,18 +40,21 @@ def send_discord_notify(msg):
 def watcher_loop():
     import time
     while True:
-        print("監視ループ実行中")
-        with app.app_context():  # ← これを追加
+        print("監視ループ実行中", flush=True)
+        with app.app_context():
             products = Product.query.all()
             for p in products:
                 price = get_price(p.url)
                 if price is None:
-                    print(f"{p.name} 価格取得失敗")
+                    print(f"⚠️ {p.name} 価格取得失敗", flush=True)
                     continue
-                print(f"{p.name} 現在価格: {price}円")
+                print(f"✅ {p.name} 現在価格: {price}円", flush=True)
                 if price <= p.threshold:
-                    send_discord_alert(p.name, price, p.threshold, p.url)
+                    msg = f"🔔 **{p.name}** がしきい値（{p.threshold}円）を下回りました！\n現在価格: {price}円\n{p.url}"
+                    print(f"🚨 通知送信: {msg}", flush=True)
+                    send_discord_notify(msg)
         time.sleep(300)
+
 
 
 # Webルート
