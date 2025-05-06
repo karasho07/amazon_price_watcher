@@ -59,19 +59,27 @@ def send_discord_notify(msg):
 def watcher_loop():
     while True:
         print("監視ループ実行中", flush=True)
-        with app.app_context():
-            products = Product.query.all()
-            for p in products:
-                price = get_price(p.url)
-                if price is None:
-                    print(f"⚠️ {p.name} 価格取得失敗", flush=True)
-                    continue
-                print(f"✅ {p.name} 現在価格: {price}円", flush=True)
-                if price <= p.threshold:
-                    msg = f"🔔 **{p.name}** がしきい値（{p.threshold}円）を下回りました！\n現在価格: {price}円\n{p.url}"
-                    print(f"🚨 通知送信: {msg}", flush=True)
-                    send_discord_notify(msg)
+        try:
+            with app.app_context():
+                products = Product.query.all()
+                for p in products:
+                    try:
+                        price = get_price(p.url)
+                        if price is None:
+                            print(f"⚠️ {p.name} 価格取得失敗", flush=True)
+                            continue
+                        print(f"✅ {p.name} 現在価格: {price}円", flush=True)
+                        if price <= p.threshold:
+                            msg = f"🔔 **{p.name}** がしきい値（{p.threshold}円）を下回りました！\n現在価格: {price}円\n{p.url}"
+                            print(f"🚨 通知送信: {msg}", flush=True)
+                            send_discord_notify(msg)
+                    except Exception as e:
+                        print(f"[エラー] 商品ごとの処理中に例外発生: {e}", flush=True)
+        except Exception as loop_error:
+            print(f"[致命的エラー] 監視ループでクラッシュ: {loop_error}", flush=True)
+
         time.sleep(300)
+
 
 # Webルート
 @app.route("/", methods=["GET", "POST"])
