@@ -16,24 +16,40 @@ watching = False
 # 商品価格を取得する関数
 def get_price(url):
     try:
-        headers = {"User-Agent": "Mozilla/5.0"}
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
         res = requests.get(url, headers=headers, timeout=10)
         soup = BeautifulSoup(res.text, "html.parser")
 
-        whole = soup.select_one(".a-price-whole")
-        fraction = soup.select_one(".a-price-fraction")
+        # 優先度高い順に取得を試みる
+        price_text = None
 
-        if whole:
-            price_text = whole.get_text() + (fraction.get_text() if fraction else "")
-            price = int("".join(filter(str.isdigit, price_text)))
-            return price
+        selectors = [
+            ".a-price .a-offscreen",
+            "#priceblock_dealprice",
+            "#priceblock_ourprice",
+            ".a-price-whole"
+        ]
 
-        print("価格情報が見つかりません")
-        return None
+        for sel in selectors:
+            tag = soup.select_one(sel)
+            if tag:
+                price_text = tag.get_text(strip=True)
+                break
+
+        if price_text is None:
+            print("価格情報が見つかりません")
+            return None
+
+        # 数字以外を除去（カンマや円記号対応）
+        price = int("".join(filter(str.isdigit, price_text)))
+        return price
 
     except Exception as e:
         print(f"価格取得エラー: {e}", flush=True)
         return None
+
 
 
 
