@@ -136,10 +136,12 @@ def index():
 # 起動処理
 if __name__ == "__main__":
     with app.app_context():
+        print("== DBリセット ==")
+        db.drop_all()
         db.create_all()
+
     threading.Thread(target=watcher_loop, daemon=True).start()
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)))
 
-with app.app_context():
-    db.drop_all()
-    db.create_all()
+
+
