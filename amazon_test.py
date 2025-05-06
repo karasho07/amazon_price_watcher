@@ -1,20 +1,43 @@
 import requests
 from bs4 import BeautifulSoup
 
-url = "https://www.amazon.co.jp/dp/B0D5XRM3TV"
-headers = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-}
+def get_price(url):
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
+        }
+        res = requests.get(url, headers=headers, timeout=10)
+        soup = BeautifulSoup(res.text, "html.parser")
 
-res = requests.get(url, headers=headers, timeout=10)
-soup = BeautifulSoup(res.text, "html.parser")
+        # 複数のセレクタで価格を探す
+        selectors = [
+            ".a-price .a-offscreen",
+            "#priceblock_ourprice",
+            "#priceblock_dealprice",
+            ".a-price-whole"
+        ]
 
-# 価格表示部分を探す
-whole = soup.select_one(".a-price-whole")
-fraction = soup.select_one(".a-price-fraction")
+        price_text = None
+        for sel in selectors:
+            tag = soup.select_one(sel)
+            if tag:
+                price_text = tag.get_text(strip=True)
+                break
 
-print("whole:", whole)
-print("fraction:", fraction)
+        if price_text is None:
+            print("価格情報が見つかりません")
+            return None
 
-# ページの最初の一部も表示（確認用）
-print("HTML冒頭:", res.text[:500])
+        # 数字だけを抽出（カンマや「円」を除去）
+        return int("".join(filter(str.isdigit, price_text)))
+
+    except Exception as e:
+        print(f"価格取得エラー: {e}")
+        return None
+
+
+# テスト実行部分
+if __name__ == "__main__":
+    url = "https://www.amazon.co.jp/dp/B0D5XRM3TV"
+    price = get_price(url)
+    print("取得価格:", price)
