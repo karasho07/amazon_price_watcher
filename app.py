@@ -13,7 +13,15 @@ db.init_app(app)
 
 watching = False
 
-# 商品価格を取得する関数（改良版）
+# URLを短縮する関数
+def clean_amazon_url(url):
+    parts = url.split("/dp/")
+    if len(parts) > 1:
+        dp_part = parts[1].split("/")[0].split("?")[0]
+        return f"https://www.amazon.co.jp/dp/{dp_part}"
+    return url
+
+# 商品価格を取得する関数
 def get_price(url):
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -24,10 +32,10 @@ def get_price(url):
         soup = BeautifulSoup(res.text, "html.parser")
 
         selectors = [
-            "#priceblock_ourprice",         # 通常価格
-            "#priceblock_dealprice",        # セール価格
-            "#priceblock_pospromoprice",    # プロモ価格
-            ".a-price .a-offscreen",        # 上記がない場合のフォールバック
+            "#priceblock_ourprice",
+            "#priceblock_dealprice",
+            "#priceblock_pospromoprice",
+            ".a-price .a-offscreen",
         ]
 
         for selector in selectors:
@@ -44,8 +52,6 @@ def get_price(url):
 
     return None
 
-
-
 # Discord通知
 def send_discord_notify(msg):
     webhook = os.environ.get("DISCORD_WEBHOOK_URL")
@@ -59,27 +65,22 @@ def send_discord_notify(msg):
 def watcher_loop():
     while True:
         print("監視ループ実行中", flush=True)
-        try:
-            with app.app_context():
-                products = Product.query.all()
-                for p in products:
-                    try:
-                        price = get_price(p.url)
-                        if price is None:
-                            print(f"⚠️ {p.name} 価格取得失敗", flush=True)
-                            continue
-                        print(f"✅ {p.name} 現在価格: {price}円", flush=True)
-                        if price <= p.threshold:
-                            msg = f"🔔 **{p.name}** がしきい値（{p.threshold}円）を下回りました！\n現在価格: {price}円\n{p.url}"
-                            print(f"🚨 通知送信: {msg}", flush=True)
-                            send_discord_notify(msg)
-                    except Exception as e:
-                        print(f"[エラー] 商品ごとの処理中に例外発生: {e}", flush=True)
-        except Exception as loop_error:
-            print(f"[致命的エラー] 監視ループでクラッシュ: {loop_error}", flush=True)
-
+        with app.app_context():
+            products = Product.query.all()
+            for p in products:
+                try:
+                    price = get_price(p.url)
+                    if price is None:
+                        print(f"⚠️ {p.name} 価格取得失敗", flush=True)
+                        continue
+                    print(f"✅ {p.name} 現在価格: {price}円", flush=True)
+                    if price <= p.threshold:
+                        msg = f"🔔 **{p.name}** がしきい値（{p.threshold}円）を下回りました！\n現在価格: {price}円\n{p.url}"
+                        print(f"🚨 通知送信: {msg}", flush=True)
+                        send_discord_notify(msg)
+                except Exception as e:
+                    print(f"🚫 {p.name} エラー: {e}", flush=True)
         time.sleep(300)
-
 
 # Webルート
 @app.route("/", methods=["GET", "POST"])
@@ -104,7 +105,7 @@ def index():
         elif "name" in request.form and "url" in request.form and "threshold" in request.form:
             try:
                 name = request.form["name"]
-                url = request.form["url"]
+                url = clean_amazon_url(request.form["url"])
                 threshold = int(request.form["threshold"])
                 new_product = Product(name=name, url=url, threshold=threshold)
                 db.session.add(new_product)
